@@ -7,6 +7,7 @@ output:
   html_document: default
   pdf_document: default
 ---
+Click this link to access the HTML version of the README.rmd file: https://angierosy02.github.io/GettingAndCleaningDataProject/README.html
 
 ## Description
 The purpose of this project is to create a tidy data set based on the Human Activity Recognition Using Smartphones Database available at the [UCI Machine Learning Reporsitory](http://archive.ics.uci.edu/ml/datasets/Human+Activity+Recognition+Using+Smartphones) that shows the average for each of the features and subjects. Access the \"codebook\_tidyData.rmd\" file to read detailed descriptions for each variable used in this data set.
