@@ -1,0 +1,149 @@
+---
+title: Getting and Cleaning the *Human Activity Recognition Using Smartphones Database*
+  - Course Project
+author: "Angie Marchany-Rivera"
+date: "7/16/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+## Description
+The purpose of this project is to create a tidy data set based on the Human Activity Recognition Using Smartphones Database available at the [UCI Machine Learning Reporsitory](http://archive.ics.uci.edu/ml/datasets/Human+Activity+Recognition+Using+Smartphones) that shows the average for each of the features and subjects. Access the \"codebook\_tidyData.rmd\" file to read detailed descriptions for each variable used in this data set.
+
+You can download the data for this project from the following link:
+https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip   
+
+The data set linked above represents data collected from the accelerometers from the Samsung Galaxy S smartphone. This dataset contains the following files:  
+
+1. activity\_labels.txt \- Includes the identifier and the name of each activity performed by the subject  
+2. features.txt \- Includes the variable names for all 561 features  
+3. features_info.txt \- Information about how the variables were measured and analyzed  
+4. README.txt \- Information about the experiment, data collection and analysis  
+5. test folder \- The test data is located in the \"X\_test\.txt\", the activity identifier is located in the \"Y\_test\.txt\" and the subject identifier for each row of data is located in the \"subject\_test\.txt\". Other files in this folder were not used in this project.  
+6. train folder \- The train data is located in the \"X\_train\.txt\", the activity identifier is located in the \"Y\_train\.txt\" and the subject identifier for each row of data is located in the \"subject\_train\.txt\". Other files in this folder were not used in this project.  
+
+
+
+## Code Description
+Note: The following code can be found in the \"run_analysis.R\" file.
+
+### Installed Packages  
+```{r, eval = FALSE}
+install.packages("dplyr")  
+install.packages("gsubfn")  
+install.packages("tidyr")
+```
+
+```{r, message = FALSE, warning = FALSE}
+library(dplyr)  
+library(gsubfn)  
+library(tidyr)
+```
+
+### Getting the Data from the database link and unzipping the folder into the local directory
+```{r, message = FALSE, warning = FALSE}
+setwd("C:/Users/angie/Desktop/GettingAndCleaningDataProject")
+
+if(!file.exists("./data")){dir.create("./data")}
+fileUrl <- "https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip"
+download.file(fileUrl,destfile="./data/Dataset.zip",method="curl")
+unzip(zipfile="./data/Dataset.zip",exdir="./data")
+```
+
+### Finding the file path and saving the file names into a list
+```{r, message = FALSE, warning = FALSE}
+path_rf <- file.path("./data" , "UCI HAR Dataset")
+list_files<- list.files(path_rf, full.names = T, recursive = TRUE)
+list_files
+```
+
+### Reading the data from the targeted files.
+Review the output of ```list_files``` as reference for the indexes used below.  
+
+```{r, message = FALSE, warning = FALSE}
+activity_labels <-read.table(list_files[[1]], header = F, col.names = c("id","Activity"),stringsAsFactors = TRUE) #labels for each activity
+col_names <- read.table(list_files[[2]], header = F) #List of features
+
+# Column bind the subject and activity identifiers into the first and second column of the test data frame
+test_data <- cbind(read.table(list_files[[16]], header = F, col.names = "Activity"),
+                   read.table(list_files[[14]], header = F, col.names = "Subject"),
+                   read.table(list_files[[15]], header = F, col.names = col_names[,2]))
+
+# Column bind the subject and activity identifiers into the first and second column of the train data frame
+train_data <- cbind(read.table(list_files[[28]], header = F,col.names = "Activity"),
+                    read.table(list_files[[26]], header = F, col.names = "Subject"),
+                    read.table(list_files[[27]], header = F, col.names = col_names[,2]))
+```
+
+### Merging the ```train_data``` and ```test_data``` data frames into one data frame using the row binding function ```rbind```.
+
+```{r, message = FALSE, warning = FALSE}
+allData <- rbind(test_data,train_data)
+
+#Sample output of allData. Notice that there are no descriptive names for the activities or features (i.e, column names) in this data frame.
+allData[1:2,1:20] 
+```
+### Using descriptive activity names to replace the activity id in the ```allData``` data frame.
+
+```{r, message = FALSE, warning = FALSE}
+#Make the labels descriptive by removing the "_" in between words.
+activity_labels <- gsub("_"," ",activity_labels$Activity)
+
+# Replace the activity id number with its corresponding label.
+allData$Activity<-factor(allData$Activity, labels = activity_labels)
+
+#Sample output of allData. Notice that the activities are now labeled.
+allData[1:2,1:20]
+```
+### Extracting only the measurements on the mean and standard deviation for each feature in the ```allData``` data frame.
+
+```{r, message = FALSE, warning = FALSE}
+subData <- allData %>% select(Activity, Subject, contains(".mean."),contains(".std."))
+
+#Sample output of subData.
+subData[1:2,1:20]
+```
+### Creating a second, independent tidy data set with the average of each feature for each activity and each subject in the ```subData``` data frame.
+
+```{r, message = FALSE, warning = FALSE}
+tidyData <- subData %>% group_by(Subject, Activity) %>% 
+        summarize(across(.cols = everything(),.fns = mean)) %>%
+        gather(key = "Feature", value = "Average", - Activity,- Subject)
+
+#Sample output of tidyData.
+head(tidyData, n=4)
+```
+
+### Labeling the data set with descriptive variable names by separating the parts of each feature into a unique column.
+```{r, message = FALSE, warning = FALSE}
+ # Creates a character vector with the patterns that show up on the name of each feature.
+patterns <- c("^t","^f","(Body){1}|(Body){2}","Acc","Gyro","Jerk","Gravity","Mag","\\.mean|\\.mean\\.\\.",
+              "\\.std|\\.std\\.\\.","\\.X|\\.\\.\\.X","\\.Y|\\.\\.\\.Y","\\.Z|\\.\\.\\.Z")
+
+ # Creates a character vector with the replacement for each pattern that shows up on the name of each feature.
+replacements <-c("Time","Frequency","_Body","_Accelerometer","_Gyroscope",
+                 " Jerk","_Gravity"," Magnitude","_Mean","_std"," in X direction"," in Y direction"," in Z direction")
+
+# Apply the gsub function to find each pattern and replace it.
+for(i in 1:length(patterns)){
+        tidyData$Feature <- gsub(patterns[i],replacements[i],tidyData$Feature)}
+
+#Separate each word on the feature's name and assign it to a new column with descriptive variable names.
+tidyData <- tidyData %>%  separate(Feature, c("Domain","Motion","Sensor","Values"),sep = "_")
+
+#Final output
+tidyData
+```
+
+To print ```tidyData``` into a text file use:
+```{r, eval=FALSE}
+write.table(tidyData,file = "tidyData.txt", sep = "\t", row.names = FALSE)
+```
+## Codebook for tidyData: \"codebook_tidyData.rmd\"
+
+The codebook for ```tidyData``` was generated using the dataMaid package:  ```library(dataMaid), makeCodebook(tidyData)```. This codebook was edited to show labels and descriptions for each variable in the ```tidyData``` data frame.
+
+## Acknowledgment
+This project was completed as part of the Getting and Cleaning Data Course from John Hopkins University Data Science Specialication in Coursera.
+
